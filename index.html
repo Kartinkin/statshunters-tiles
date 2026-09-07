@@ -12,9 +12,18 @@
 <body>
 <div id="map"></div>
 <div class="panel">
-  <button id="locate">◎ GPS</button>
+  <button id="follow" class="active">⦿ Follow GPS</button>
   <div id="status">GPS: waiting…</div>
-  <div id="tile">Tile: —</div>
+  <hr>
+  <div id="sh-form">
+    <input id="sh-token" type="text" placeholder="StatsHunters API token" autocomplete="off" spellcheck="false">
+    <button id="sh-sync">⬇ Sync tiles</button>
+  </div>
+  <div id="sh-saved" class="hidden">
+    <button id="sh-reload" class="link">reload</button>
+    <button id="sh-change" class="link">change</button>
+  </div>
+  <div id="sh-status">Tiles: —</div>
 </div>
 <div class="attribution">© OpenStreetMap contributors</div>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>

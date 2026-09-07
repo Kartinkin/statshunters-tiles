@@ -4,7 +4,7 @@ L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{
   maxZoom:19, attribution:'© OpenStreetMap contributors'
 }).addTo(map);
 
-let marker=null, accuracyCircle=null, gridLayer=L.layerGroup().addTo(map);
+let marker=null, accuracyCircle=null, visitedLayer=L.layerGroup().addTo(map), gridLayer=L.layerGroup().addTo(map);
 let currentTileLayer=null;
 let gpsStarted=false;
 let autoCenter=true;
@@ -26,8 +26,10 @@ function tileBounds(t){
     [latFromY(t.y),   lonFromX(t.x+1)]
   ];
 }
+const GRID_MIN_ZOOM=11;
 function drawGrid(){
   gridLayer.clearLayers();
+  if(map.getZoom()<GRID_MIN_ZOOM) return;
   const b=map.getBounds();
   const a=xy(b.getNorth(),b.getWest()), c=xy(b.getSouth(),b.getEast());
   for(let x=a.x-1;x<=c.x+1;x++){
@@ -49,6 +51,84 @@ function highlightTile(t){
   currentTileLayer.bringToFront();
 }
 
+const SH_API='https://www.statshunters.com/api';
+const visitedTiles=new Map();
+
+function tileKey(t){return t.x+','+t.y}
+
+function addVisitedTile(t){
+  const key=tileKey(t);
+  if(visitedTiles.has(key)) return;
+  const rect=L.rectangle(tileBounds(t),{
+    color:'#ff0000',weight:0,fillColor:'#ff0000',fillOpacity:.25,interactive:false
+  }).addTo(visitedLayer);
+  visitedTiles.set(key,rect);
+}
+
+function loadTilesFromCache(){
+  try{
+    const raw=localStorage.getItem('sh_tiles');
+    if(!raw) return;
+    JSON.parse(raw).forEach(([x,y])=>addVisitedTile({x,y}));
+  }catch(e){}
+}
+
+function saveTilesToCache(){
+  const arr=[...visitedTiles.keys()].map(k=>k.split(',').map(Number));
+  localStorage.setItem('sh_tiles',JSON.stringify(arr));
+}
+
+async function fetchAllTiles(token){
+  const res=await fetch(`${SH_API}/${encodeURIComponent(token)}/tiles`);
+  if(!res.ok) throw new Error('HTTP '+res.status);
+  const data=await res.json();
+  for(const t of data.tiles||[]) addVisitedTile(t);
+}
+
+const tokenInput=document.getElementById('sh-token');
+const syncBtn=document.getElementById('sh-sync');
+const shStatus=document.getElementById('sh-status');
+const shForm=document.getElementById('sh-form');
+const shSaved=document.getElementById('sh-saved');
+const shChangeBtn=document.getElementById('sh-change');
+const shReloadBtn=document.getElementById('sh-reload');
+
+function showTokenForm(show){
+  shForm.classList.toggle('hidden',!show);
+  shSaved.classList.toggle('hidden',show);
+}
+function applySavedToken(token){
+  tokenInput.value=token;
+  showTokenForm(false);
+}
+
+async function syncTiles(){
+  const token=tokenInput.value.trim();
+  if(!token){ shStatus.textContent='Enter a StatsHunters API token first'; return; }
+  syncBtn.disabled=true;
+  shStatus.textContent='Loading tiles…';
+  try{
+    await fetchAllTiles(token);
+    saveTilesToCache();
+    localStorage.setItem('sh_token',token);
+    applySavedToken(token);
+    shStatus.textContent=`Tiles: ${visitedTiles.size} (synced)`;
+  }catch(e){
+    shStatus.textContent='Sync failed: '+e.message;
+  }finally{
+    syncBtn.disabled=false;
+  }
+}
+
+const savedToken=localStorage.getItem('sh_token')||'';
+if(savedToken) applySavedToken(savedToken);
+else showTokenForm(true);
+loadTilesFromCache();
+if(visitedTiles.size) shStatus.textContent=`Tiles: ${visitedTiles.size} (cached)`;
+syncBtn.onclick=syncTiles;
+shChangeBtn.onclick=()=>showTokenForm(true);
+shReloadBtn.onclick=syncTiles;
+
 function showPosition(pos){
   const {latitude,longitude,accuracy:acc}=pos.coords;
   const latlng=[latitude,longitude];
@@ -64,9 +144,7 @@ function showPosition(pos){
   const t=xy(latitude,longitude);
   highlightTile(t);
 
-  document.getElementById('status').textContent =
-    `GPS: ${latitude.toFixed(5)}, ${longitude.toFixed(5)} ±${Math.round(acc||0)} m`;
-  document.getElementById('tile').textContent=`Current z14 tile: ${t.x}/${t.y}`;
+  document.getElementById('status').textContent=`GPS: active ±${Math.round(acc||0)} m`;
 
   // Keep the user's position centered automatically while GPS is active.
   // If the user manually pans/zooms, stop following until GPS is pressed again.
@@ -81,17 +159,12 @@ function showPosition(pos){
 }
 
 function startGPS(){
-  if(gpsStarted) {
-    autoCenter=true;
-    if(marker) map.panTo(marker.getLatLng(),{animate:false});
-    return;
-  }
+  if(gpsStarted) return;
   if(!navigator.geolocation){
     document.getElementById('status').textContent='GPS unavailable';
     return;
   }
   gpsStarted=true;
-  autoCenter=true;
   navigator.geolocation.watchPosition(
     showPosition,
     e=>document.getElementById('status').textContent='GPS error: '+e.message,
@@ -99,11 +172,21 @@ function startGPS(){
   );
 }
 
-map.on('dragstart',()=>{ if(!firstFix) autoCenter=false; });
-document.getElementById('locate').onclick=()=>{
-  autoCenter=true;
-  if(marker) map.panTo(marker.getLatLng(),{animate:false});
-  else startGPS();
+const followBtn=document.getElementById('follow');
+function setFollow(on){
+  autoCenter=on;
+  followBtn.classList.toggle('active',on);
+}
+
+map.on('dragstart',()=>{ if(!firstFix) setFollow(false); });
+followBtn.onclick=()=>{
+  if(autoCenter){
+    setFollow(false);
+  } else {
+    setFollow(true);
+    if(marker) map.panTo(marker.getLatLng(),{animate:false});
+  }
+  startGPS();
 };
 startGPS();
 
