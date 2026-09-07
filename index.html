@@ -15,16 +15,33 @@
   <button id="follow" class="active">⦿ Follow GPS</button>
   <div id="status">GPS: waiting…</div>
   <hr>
-  <div id="sh-form">
-    <input id="sh-token" type="text" placeholder="StatsHunters API token" autocomplete="off" spellcheck="false">
-    <button id="sh-sync">⬇ Sync tiles</button>
-  </div>
-  <div id="sh-saved" class="hidden">
-    <button id="sh-reload" class="link">reload</button>
-    <button id="sh-change" class="link">change</button>
-  </div>
-  <div id="sh-status">Tiles: —</div>
+  <button id="reload-btn">↻ Reload tiles</button>
+  <button id="settings-btn">⚙ Settings</button>
 </div>
+
+<div id="settings-overlay" class="hidden">
+  <div id="settings-modal">
+    <h3>Settings</h3>
+
+    <label>StatsHunters API token</label>
+    <div id="sh-form">
+      <input id="sh-token" type="text" placeholder="StatsHunters API token" autocomplete="off" spellcheck="false">
+      <button id="sh-sync">⬇ Sync tiles</button>
+    </div>
+    <div id="sh-saved" class="hidden">
+      <button id="sh-change" class="link">change</button>
+    </div>
+    <div id="sh-status">Tiles: —</div>
+
+    <hr>
+
+    <label for="zoom-setting">Grid & tiles visible from zoom</label>
+    <input id="zoom-setting" type="number" min="1" max="19" step="1">
+
+    <button id="settings-close">Close</button>
+  </div>
+</div>
+
 <div class="attribution">© OpenStreetMap contributors</div>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="app.js"></script>

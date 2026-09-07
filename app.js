@@ -26,10 +26,12 @@ function tileBounds(t){
     [latFromY(t.y),   lonFromX(t.x+1)]
   ];
 }
-const GRID_MIN_ZOOM=11;
+let minZoom=parseInt(localStorage.getItem('sh_min_zoom'))||11;
+const TILES_ZOOM_OFFSET=5; // tiles stay visible this many zoom steps below the grid's cutoff
+
 function drawGrid(){
   gridLayer.clearLayers();
-  if(map.getZoom()<GRID_MIN_ZOOM) return;
+  if(map.getZoom()<minZoom) return;
   const b=map.getBounds();
   const a=xy(b.getNorth(),b.getWest()), c=xy(b.getSouth(),b.getEast());
   for(let x=a.x-1;x<=c.x+1;x++){
@@ -54,13 +56,30 @@ function highlightTile(t){
 const SH_API='https://www.statshunters.com/api';
 const visitedTiles=new Map();
 
+function updateVisitedVisibility(){
+  const show=map.getZoom()>=minZoom-TILES_ZOOM_OFFSET;
+  if(show && !map.hasLayer(visitedLayer)) visitedLayer.addTo(map);
+  if(!show && map.hasLayer(visitedLayer)) map.removeLayer(visitedLayer);
+}
+
+function currentTileOpacity(){
+  return map.getZoom()<minZoom ? 0.65 : 0.25;
+}
+function updateTilesOpacity(){
+  const op=currentTileOpacity();
+  visitedTiles.forEach(rect=>rect.setStyle({fillOpacity:op}));
+}
+
+map.on('zoomend',()=>{ updateVisitedVisibility(); updateTilesOpacity(); });
+updateVisitedVisibility();
+
 function tileKey(t){return t.x+','+t.y}
 
 function addVisitedTile(t){
   const key=tileKey(t);
   if(visitedTiles.has(key)) return;
   const rect=L.rectangle(tileBounds(t),{
-    color:'#ff0000',weight:0,fillColor:'#ff0000',fillOpacity:.25,interactive:false
+    color:'#ff0000',weight:0,fillColor:'#ff0000',fillOpacity:currentTileOpacity(),interactive:false
   }).addTo(visitedLayer);
   visitedTiles.set(key,rect);
 }
@@ -91,7 +110,7 @@ const shStatus=document.getElementById('sh-status');
 const shForm=document.getElementById('sh-form');
 const shSaved=document.getElementById('sh-saved');
 const shChangeBtn=document.getElementById('sh-change');
-const shReloadBtn=document.getElementById('sh-reload');
+const reloadBtn=document.getElementById('reload-btn');
 
 function showTokenForm(show){
   shForm.classList.toggle('hidden',!show);
@@ -120,14 +139,35 @@ async function syncTiles(){
   }
 }
 
+const settingsBtn=document.getElementById('settings-btn');
+const settingsOverlay=document.getElementById('settings-overlay');
+const settingsClose=document.getElementById('settings-close');
+const zoomInput=document.getElementById('zoom-setting');
+
+function openSettings(){ settingsOverlay.classList.remove('hidden'); }
+function closeSettings(){ settingsOverlay.classList.add('hidden'); }
+
+zoomInput.value=minZoom;
+zoomInput.onchange=()=>{
+  minZoom=parseInt(zoomInput.value)||1;
+  localStorage.setItem('sh_min_zoom',minZoom);
+  drawGrid();
+  updateVisitedVisibility();
+  updateTilesOpacity();
+};
+
+settingsBtn.onclick=openSettings;
+settingsClose.onclick=closeSettings;
+settingsOverlay.onclick=e=>{ if(e.target===settingsOverlay) closeSettings(); };
+
 const savedToken=localStorage.getItem('sh_token')||'';
 if(savedToken) applySavedToken(savedToken);
-else showTokenForm(true);
+else { showTokenForm(true); openSettings(); }
 loadTilesFromCache();
 if(visitedTiles.size) shStatus.textContent=`Tiles: ${visitedTiles.size} (cached)`;
 syncBtn.onclick=syncTiles;
 shChangeBtn.onclick=()=>showTokenForm(true);
-shReloadBtn.onclick=syncTiles;
+reloadBtn.onclick=syncTiles;
 
 function showPosition(pos){
   const {latitude,longitude,accuracy:acc}=pos.coords;
