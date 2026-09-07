@@ -106,7 +106,6 @@ async function fetchAllTiles(token){
 
 const tokenInput=document.getElementById('sh-token');
 const syncBtn=document.getElementById('sh-sync');
-const shStatus=document.getElementById('sh-status');
 const shForm=document.getElementById('sh-form');
 const shSaved=document.getElementById('sh-saved');
 const shChangeBtn=document.getElementById('sh-change');
@@ -121,21 +120,33 @@ function applySavedToken(token){
   showTokenForm(false);
 }
 
+function updateReloadLabel(failed){
+  const icon=failed ? '⚠' : '↻';
+  reloadBtn.textContent=visitedTiles.size ? `${icon} ${visitedTiles.size} tiles` : `${icon} Reload tiles`;
+  reloadBtn.classList.toggle('error',!!failed);
+}
+
 async function syncTiles(){
   const token=tokenInput.value.trim();
-  if(!token){ shStatus.textContent='Enter a StatsHunters API token first'; return; }
+  if(!token){ tokenInput.reportValidity(); tokenInput.focus(); return; }
   syncBtn.disabled=true;
-  shStatus.textContent='Loading tiles…';
+  reloadBtn.disabled=true;
+  reloadBtn.classList.remove('error');
+  reloadBtn.title='';
+  reloadBtn.textContent='Reloading…';
+  let failed=false;
   try{
     await fetchAllTiles(token);
     saveTilesToCache();
     localStorage.setItem('sh_token',token);
     applySavedToken(token);
-    shStatus.textContent=`Tiles: ${visitedTiles.size} (synced)`;
   }catch(e){
-    shStatus.textContent='Sync failed: '+e.message;
+    failed=true;
+    reloadBtn.title='Sync failed: '+e.message;
   }finally{
     syncBtn.disabled=false;
+    reloadBtn.disabled=false;
+    updateReloadLabel(failed);
   }
 }
 
@@ -164,7 +175,7 @@ const savedToken=localStorage.getItem('sh_token')||'';
 if(savedToken) applySavedToken(savedToken);
 else { showTokenForm(true); openSettings(); }
 loadTilesFromCache();
-if(visitedTiles.size) shStatus.textContent=`Tiles: ${visitedTiles.size} (cached)`;
+updateReloadLabel();
 syncBtn.onclick=syncTiles;
 shChangeBtn.onclick=()=>showTokenForm(true);
 reloadBtn.onclick=syncTiles;

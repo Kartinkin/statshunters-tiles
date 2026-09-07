@@ -15,7 +15,6 @@
   <button id="follow" class="active">⦿ Follow GPS</button>
   <div id="status">GPS: waiting…</div>
   <hr>
-  <button id="reload-btn">↻ Reload tiles</button>
   <button id="settings-btn">⚙ Settings</button>
 </div>
 
@@ -25,13 +24,13 @@
 
     <label>StatsHunters API token</label>
     <div id="sh-form">
-      <input id="sh-token" type="text" placeholder="StatsHunters API token" autocomplete="off" spellcheck="false">
+      <input id="sh-token" type="text" placeholder="StatsHunters API token" autocomplete="off" spellcheck="false" required>
       <button id="sh-sync">⬇ Sync tiles</button>
     </div>
     <div id="sh-saved" class="hidden">
       <button id="sh-change" class="link">change</button>
     </div>
-    <div id="sh-status">Tiles: —</div>
+    <button id="reload-btn">↻ Reload tiles</button>
 
     <hr>
 
