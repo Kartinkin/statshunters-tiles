@@ -1,4 +1,4 @@
-const APP_CACHE='tile-grid-v4';
+const APP_CACHE='tile-grid-v4.1';
 const TILE_CACHE='osm-tiles-v1';
 const TILE_CACHE_LIMIT=3000;
 
