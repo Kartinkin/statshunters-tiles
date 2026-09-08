@@ -1,5 +1,5 @@
 const Z=14,N=2**Z;
-const map=L.map('map',{zoomControl:true}).setView([56.95,24.1],13);
+const map=L.map('map',{zoomControl:true,preferCanvas:true}).setView([56.95,24.1],13);
 L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{
   maxZoom:19, attribution:'© OpenStreetMap contributors'
 }).addTo(map);
@@ -45,7 +45,11 @@ function drawGrid(){
 }
 map.on('moveend zoomend',drawGrid); drawGrid();
 
+let currentTileKey=null;
 function highlightTile(t){
+  const key=t.x+','+t.y;
+  if(key===currentTileKey) return;
+  currentTileKey=key;
   if(currentTileLayer) map.removeLayer(currentTileLayer);
   currentTileLayer=L.rectangle(tileBounds(t),{
     color:'#1565c0',weight:3,fillOpacity:.16,interactive:false
@@ -65,8 +69,12 @@ function updateVisitedVisibility(){
 function currentTileOpacity(){
   return map.getZoom()<minZoom ? 0.65 : 0.25;
 }
+
+let lastTilesOpacity=null;
 function updateTilesOpacity(){
   const op=currentTileOpacity();
+  if(op===lastTilesOpacity) return;
+  lastTilesOpacity=op;
   visitedTiles.forEach(rect=>rect.setStyle({fillOpacity:op}));
 }
 
@@ -115,6 +123,7 @@ function showTokenForm(show){
   shForm.classList.toggle('hidden',!show);
   shSaved.classList.toggle('hidden',show);
 }
+
 function applySavedToken(token){
   tokenInput.value=token;
   showTokenForm(false);
@@ -180,6 +189,8 @@ syncBtn.onclick=syncTiles;
 shChangeBtn.onclick=()=>showTokenForm(true);
 reloadBtn.onclick=syncTiles;
 
+const statusEl=document.getElementById('status');
+
 function showPosition(pos){
   const {latitude,longitude,accuracy:acc}=pos.coords;
   const latlng=[latitude,longitude];
@@ -195,7 +206,7 @@ function showPosition(pos){
   const t=xy(latitude,longitude);
   highlightTile(t);
 
-  document.getElementById('status').textContent=`GPS: active ±${Math.round(acc||0)} m`;
+  statusEl.textContent=`GPS: active ±${Math.round(acc||0)} m`;
 
   // Keep the user's position centered automatically while GPS is active.
   // If the user manually pans/zooms, stop following until GPS is pressed again.
@@ -209,19 +220,35 @@ function showPosition(pos){
   }
 }
 
+let watchId=null;
+
 function startGPS(){
   if(gpsStarted) return;
   if(!navigator.geolocation){
-    document.getElementById('status').textContent='GPS unavailable';
+    statusEl.textContent='GPS unavailable';
     return;
   }
   gpsStarted=true;
-  navigator.geolocation.watchPosition(
+  watchId=navigator.geolocation.watchPosition(
     showPosition,
-    e=>document.getElementById('status').textContent='GPS error: '+e.message,
+    e=>statusEl.textContent='GPS error: '+e.message,
     {enableHighAccuracy:true,maximumAge:3000,timeout:15000}
   );
 }
+
+function stopGPS(){
+  if(!gpsStarted) return;
+  navigator.geolocation.clearWatch(watchId);
+  watchId=null;
+  gpsStarted=false;
+}
+
+// No background tracking: GPS runs only while the screen/app is actually visible,
+// so it doesn't drain the battery in your pocket.
+document.addEventListener('visibilitychange',()=>{
+  if(document.hidden) stopGPS();
+  else startGPS();
+});
 
 const followBtn=document.getElementById('follow');
 function setFollow(on){
