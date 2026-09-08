@@ -241,4 +241,13 @@ followBtn.onclick=()=>{
 };
 startGPS();
 
-if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
+const updateBtn=document.getElementById('update-btn');
+updateBtn.onclick=()=>location.reload();
+
+if('serviceWorker' in navigator){
+  const hadController=!!navigator.serviceWorker.controller;
+  navigator.serviceWorker.register('sw.js');
+  navigator.serviceWorker.addEventListener('controllerchange',()=>{
+    if(hadController) updateBtn.classList.remove('hidden');
+  });
+}
